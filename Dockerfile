@@ -1,14 +1,14 @@
 # Get the light Node JS base image
-FROM node:alpine
+FROM node:18-alpine
 
 # Set Work Directory
 WORKDIR /app
 
 # Copy package.json file first
-COPY package.json yarn.lock ./
+COPY package.json yarn.lock* package-lock.json* ./
 
 # Install production dependencies
-RUN yarn install --production
+RUN npm install --production
 
 #Copy All files and rest of the code into container
 COPY . .
