@@ -1,0 +1,7 @@
+# The Bare Minimum
+.DS_Store
+.vscode/
+.env
+*.tfstate
+*.tfstate.*
+**/.terraform/*
