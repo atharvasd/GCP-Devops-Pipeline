@@ -29,7 +29,7 @@ async function init() {
     });
 
     pool = mysql.createPool({
-        connectionLimit: 5,
+        connectionLimit: parseInt(process.env.MYSQL_CONNECTION_LIMIT || '5', 10),
         host,
         user,
         password,

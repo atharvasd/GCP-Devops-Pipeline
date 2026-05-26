@@ -54,15 +54,9 @@ async function getItems() {
 
 async function getItem(id) {
     return new Promise((acc, rej) => {
-        db.all('SELECT * FROM todo_items WHERE id=?', [id], (err, rows) => {
+        db.get('SELECT * FROM todo_items WHERE id=?', [id], (err, row) => {
             if (err) return rej(err);
-            acc(
-                rows.map(item =>
-                    Object.assign({}, item, {
-                        completed: item.completed === 1,
-                    }),
-                )[0],
-            );
+            acc(row ? Object.assign({}, row, { completed: row.completed === 1 }) : undefined);
         });
     });
 }
