@@ -15,6 +15,7 @@ COPY . .
 
 RUN chown -R node:node /app
 
+ENV SQLITE_DB_LOCATION=/tmp/todo.db
 USER node
 
 EXPOSE 3000
