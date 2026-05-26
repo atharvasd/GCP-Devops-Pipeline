@@ -4,6 +4,7 @@
 variable "project_id" {
   type        = string
   description = "The GCP Project ID"
+  default     = "gcp-devops-pipeline-496410"
 }
 
 # ==========================================
@@ -119,4 +120,72 @@ resource "google_cloud_run_v2_service_iam_binding" "public_access" {
 # Prints the final website URL to the terminal
 output "service_url" {
   value = google_cloud_run_v2_service.app_service.uri
+}
+
+
+# ==========================================
+# 6. Workload Identity Pool
+# ==========================================
+resource "google_iam_workload_identity_pool" "github_pool" {
+
+  workload_identity_pool_id = "github-pool"
+  display_name              = "Github Actions Pool"
+}
+
+#GitHub OIDC Provider
+resource "google_iam_workload_identity_pool_provider" "github_provider" {
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github_pool.workload_identity_pool_id
+  workload_identity_pool_provider_id = "github-provider"
+  oidc {
+    issuer_uri = "https://token.actions.githubusercontent.com"
+  }
+  attribute_mapping = {
+    "google.subject"       = "assertion.sub"
+    "attribute.actor"      = "assertion.actor"
+    "attribute.repository" = "assertion.repository"
+  }
+  #Only YOUR repo can use this pool
+  attribute_condition = "assertion.repository == 'atharvasd/GCP-Devops-Pipeline'"
+}
+
+# Service Account for GitHub Actions
+resource "google_service_account" "github_deployer" {
+  account_id   = "github-deployer"
+  display_name = "Github Actions Deployer"
+}
+
+
+# Roles
+resource "google_project_iam_member" "github_deployer_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${google_service_account.github_deployer.email}"
+}
+
+resource "google_project_iam_member" "github_deployer_ar_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${google_service_account.github_deployer.email}"
+}
+
+resource "google_project_iam_member" "github_deployer_sa_user" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member  = "serviceAccount:${google_service_account.github_deployer.email}"
+}
+
+
+# Allow GitHub Actions to impersonate the service account
+resource "google_service_account_iam_member" "github_wif_binding" {
+  service_account_id = google_service_account.github_deployer.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/atharvasd/GCP-Devops-Pipeline"
+}
+
+output "wif_provider" {
+  value = google_iam_workload_identity_pool_provider.github_provider.name
+}
+
+output "deployer_sa_email" {
+  value = google_service_account.github_deployer.email
 }
