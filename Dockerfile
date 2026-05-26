@@ -19,4 +19,4 @@ USER node
 
 EXPOSE 3000
 # Define command to start the app
-CMD ["node","start"]
+CMD ["npm","start"]
