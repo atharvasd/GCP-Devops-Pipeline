@@ -1,0 +1,63 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - prod
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      PROJECT_ID: gcp-devops-pipeline-496410
+      REGION: asia-south1
+      IMAGE_NAME: sample-web-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set environment variables
+        run: |
+          if [ "${{ github.ref_name }}" == "prod" ]; then
+            echo "REPO_ID=sample-app-repo-prod" >> $GITHUB_ENV
+            echo "CLOUD_RUN_SERVICE=sample-web-app-service-prod" >> $GITHUB_ENV
+          else
+            echo "REPO_ID=sample-app-repo-dev" >> $GITHUB_ENV
+            echo "CLOUD_RUN_SERVICE=sample-web-app-service-dev" >> $GITHUB_ENV
+          fi
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.SA_EMAIL }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and Push image
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_ID }}/${{ env.IMAGE_NAME }}:latest \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            . --push
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.CLOUD_RUN_SERVICE }} \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --quiet
